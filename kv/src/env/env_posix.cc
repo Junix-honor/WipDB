@@ -2,7 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
+#include <unistd.h>
+#include <sys/syscall.h>
+#define gettid() syscall(SYS_gettid)
+
 #include <dirent.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
 #include <sys/mman.h>
@@ -19,17 +24,16 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
+#include <iostream>
 #include <limits>
 #include <queue>
 #include <set>
-#include <unordered_map> 
 #include <string>
 #include <thread>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
-#include <dirent.h>
-#include <errno.h>
-#include <fcntl.h>
 #if defined(OS_LINUX)
 #include <linux/fs.h>
 #endif
@@ -1664,6 +1668,27 @@ struct StartThreadState {
 };
 
 static void* StartThreadWrapper(void* arg) {
+  std::fstream outfile;
+  outfile.open("tid.txt", std::ios::app);
+  outfile << "[foreground]"
+          << " TID:" << gettid()
+          << std::endl;
+  // cpu_set_t cpuset;
+  // CPU_ZERO(&cpuset);
+  // pthread_t thread = pthread_self();
+  // int core_num = port::NextCoreNumber();
+  // if (core_num < port::GetCoreNum()) {
+  //   CPU_SET(core_num, &cpuset);
+  //   int rc = pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpuset);
+  //   if (rc != 0) {
+  //     fprintf(stderr, "Error calling pthread_setaffinity_np: %d\n", rc);
+  //   }
+  //   outfile << "[foreground]"
+  //           << " TID:" << gettid()
+  //           << " pin thread to core " << core_num << std::endl;
+  // }
+  outfile.close();
+
   StartThreadState* state = reinterpret_cast<StartThreadState*>(arg);
   state->user_function(state->arg);
   delete state;

@@ -7,6 +7,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
+#include <unistd.h>
+#include <sys/syscall.h>
+#define gettid() syscall(SYS_gettid)
+
 #include "util/threadpool_imp.h"
 
 #include "monitoring/thread_status_util.h"
@@ -22,15 +26,17 @@
 #endif
 
 #include <stdlib.h>
+
 #include <algorithm>
 #include <atomic>
 #include <condition_variable>
+#include <deque>
+#include <fstream>
+#include <iostream>
 #include <mutex>
 #include <sstream>
 #include <thread>
 #include <vector>
-#include <deque>
-
 namespace kv {
 
 void ThreadPoolImpl::PthreadCall(const char* label, int result) {
@@ -145,6 +151,26 @@ ThreadPoolImpl::Impl::Impl()
       mu_(),
       bgsignal_(),
       bgthreads_() {
+  std::fstream outfile;
+  outfile.open("tid.txt", std::ios::out | std::ios::trunc);
+  outfile << "[foreground]"
+          << " TID:" << gettid()
+          << std::endl;
+  // cpu_set_t cpuset;
+  // CPU_ZERO(&cpuset);
+  // pthread_t thread = pthread_self();
+  // int core_num = port::NextCoreNumber();
+  // if (core_num < port::GetCoreNum()) {
+  //   CPU_SET(core_num, &cpuset);
+  //   int rc = pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpuset);
+  //   if (rc != 0) {
+  //     fprintf(stderr, "Error calling pthread_setaffinity_np: %d\n", rc);
+  //   }
+  //   outfile << "[foreground]"
+  //           << " TID:" << gettid()
+  //           << " pin thread to core " << core_num << std::endl;
+  // }
+  outfile.close();
 }
 
 inline
@@ -190,7 +216,26 @@ void ThreadPoolImpl::Impl::LowerCPUPriority() {
 void ThreadPoolImpl::Impl::BGThread(size_t thread_id) {
   bool low_io_priority = false;
   bool low_cpu_priority = false;
+  std::fstream outfile;
+  outfile.open("tid.txt", std::ios::app);
+  outfile << "[background] " << Env::PriorityToString(GetThreadPriority())
+          << " TID:" << gettid() << std::endl;
 
+  // cpu_set_t cpuset;
+  // CPU_ZERO(&cpuset);
+  // pthread_t thread = pthread_self();
+  // int core_num = port::NextCoreNumber();
+  // if (core_num < port::GetCoreNum()) {
+  //   CPU_SET(core_num, &cpuset);
+  //   int rc = pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpuset);
+  //   if (rc != 0) {
+  //     fprintf(stderr, "Error calling pthread_setaffinity_np: %d\n", rc);
+  //   }
+  //   outfile << "[background] " << Env::PriorityToString(GetThreadPriority())
+  //           << " TID:" << gettid()
+  //           << " pin thread to core " << core_num << std::endl;
+  // }
+  outfile.close();
   while (true) {
 // Wait until there is an item that is ready to run
     std::unique_lock<std::mutex> lock(mu_);
@@ -358,9 +403,9 @@ void ThreadPoolImpl::Impl::StartBGThreads() {
     thread_name_stream << bgthreads_.size();
     pthread_setname_np(th_handle, thread_name_stream.str().c_str());
 
-    cpu_set_t cpuset;
-    CPU_ZERO(&cpuset);
-    int core_num = port::NextCoreNumber();
+    // cpu_set_t cpuset;
+    // CPU_ZERO(&cpuset);
+    // int core_num = port::NextCoreNumber();
     // if (core_num < port::GetCoreNum()) {
     //   CPU_SET(core_num, &cpuset);
     //   int rc = pthread_setaffinity_np(th_handle,
