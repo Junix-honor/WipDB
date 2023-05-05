@@ -151,11 +151,11 @@ ThreadPoolImpl::Impl::Impl()
       mu_(),
       bgsignal_(),
       bgthreads_() {
-  std::fstream outfile;
-  outfile.open("tid.txt", std::ios::out | std::ios::trunc);
-  outfile << "[foreground]"
-          << " TID:" << gettid()
-          << std::endl;
+  // std::fstream outfile;
+  // outfile.open("tid.txt", std::ios::out | std::ios::trunc);
+  // outfile << "[foreground]"
+  //         << " TID:" << gettid()
+  //         << std::endl;
   // cpu_set_t cpuset;
   // CPU_ZERO(&cpuset);
   // pthread_t thread = pthread_self();
@@ -170,7 +170,7 @@ ThreadPoolImpl::Impl::Impl()
   //           << " TID:" << gettid()
   //           << " pin thread to core " << core_num << std::endl;
   // }
-  outfile.close();
+  // outfile.close();
 }
 
 inline
@@ -216,10 +216,10 @@ void ThreadPoolImpl::Impl::LowerCPUPriority() {
 void ThreadPoolImpl::Impl::BGThread(size_t thread_id) {
   bool low_io_priority = false;
   bool low_cpu_priority = false;
-  std::fstream outfile;
-  outfile.open("tid.txt", std::ios::app);
-  outfile << "[background] " << Env::PriorityToString(GetThreadPriority())
-          << " TID:" << gettid() << std::endl;
+  // std::fstream outfile;
+  // outfile.open("tid.txt", std::ios::app);
+  // outfile << "[background] " << Env::PriorityToString(GetThreadPriority())
+  //         << " TID:" << gettid() << std::endl;
 
   // cpu_set_t cpuset;
   // CPU_ZERO(&cpuset);
@@ -235,7 +235,7 @@ void ThreadPoolImpl::Impl::BGThread(size_t thread_id) {
   //           << " TID:" << gettid()
   //           << " pin thread to core " << core_num << std::endl;
   // }
-  outfile.close();
+  // outfile.close();
   while (true) {
 // Wait until there is an item that is ready to run
     std::unique_lock<std::mutex> lock(mu_);

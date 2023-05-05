@@ -905,21 +905,21 @@ bool PosixWritableFile::IsSyncThreadSafe() const { return true; }
 uint64_t PosixWritableFile::GetFileSize() { return filesize_; }
 
 void PosixWritableFile::SetWriteLifeTimeHint(Env::WriteLifeTimeHint hint) {
-#ifdef OS_LINUX
-// Suppress Valgrind "Unimplemented functionality" error.
-#ifndef ROCKSDB_VALGRIND_RUN
-  if (hint == write_hint_) {
-    return;
-  }
-  if (fcntl(fd_, F_SET_RW_HINT, &hint) == 0) {
-    write_hint_ = hint;
-  }
-#else
-  (void)hint;
-#endif // ROCKSDB_VALGRIND_RUN
-#else
-  (void)hint;
-#endif // OS_LINUX
+// #ifdef OS_LINUX
+// // Suppress Valgrind "Unimplemented functionality" error.
+// #ifndef ROCKSDB_VALGRIND_RUN
+//   if (hint == write_hint_) {
+//     return;
+//   }
+//   if (fcntl(fd_, F_SET_RW_HINT, &hint) == 0) {
+//     write_hint_ = hint;
+//   }
+// #else
+//   (void)hint;
+// #endif // ROCKSDB_VALGRIND_RUN
+// #else
+//   (void)hint;
+// #endif // OS_LINUX
 }
 
 Status PosixWritableFile::InvalidateCache(size_t offset, size_t length) {
@@ -1668,11 +1668,11 @@ struct StartThreadState {
 };
 
 static void* StartThreadWrapper(void* arg) {
-  std::fstream outfile;
-  outfile.open("tid.txt", std::ios::app);
-  outfile << "[foreground]"
-          << " TID:" << gettid()
-          << std::endl;
+  // std::fstream outfile;
+  // outfile.open("tid.txt", std::ios::app);
+  // outfile << "[foreground]"
+  //         << " TID:" << gettid()
+  //         << std::endl;
   // cpu_set_t cpuset;
   // CPU_ZERO(&cpuset);
   // pthread_t thread = pthread_self();
@@ -1687,7 +1687,7 @@ static void* StartThreadWrapper(void* arg) {
   //           << " TID:" << gettid()
   //           << " pin thread to core " << core_num << std::endl;
   // }
-  outfile.close();
+  // outfile.close();
 
   StartThreadState* state = reinterpret_cast<StartThreadState*>(arg);
   state->user_function(state->arg);
