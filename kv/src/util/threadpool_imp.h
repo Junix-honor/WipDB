@@ -10,6 +10,7 @@
 
 #include "kv/threadpool.h"
 #include "kv/env.h"
+#include "util/perf_log.h"
 
 #include <memory>
 #include <functional>

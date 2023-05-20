@@ -382,8 +382,8 @@ bool KV::GetProperty(const Slice& property, std::string* value) {
                 );
         value->append(buf);
         double total_io = 0;
-        double user_io = 0; 
-        for (int level = 0; level < config::kNumLevels; level++) {
+        double user_io = 0;
+        for (int level = 0; level <= config::kSplitLevel; level++) {
             if (env_->stats_[level].micros > 0) {
                 snprintf(
                     buf, sizeof(buf),
@@ -398,7 +398,10 @@ bool KV::GetProperty(const Slice& property, std::string* value) {
             total_io += env_->stats_[level].bytes_written / 1048576.0;
         }
 
-        snprintf(buf, sizeof(buf), "BucketCount: %d\nWriteAmplification: %2.4f\n", (int)GetBuckets().size(), total_io / user_io);
+        double wa =(total_io==0||user_io==0)?0: total_io / user_io;
+        snprintf(buf, sizeof(buf),
+                 "BucketCount: %d\nWriteAmplification: %2.4f\n",
+                 (int)GetBuckets().size(), wa);
         value->append(buf);
 
         // snprintf(buf, sizeof(buf), "BucketName, Size\n");
@@ -435,16 +438,34 @@ void KV::PrintStats(const char* key) {
     if (!GetProperty(key, &stats)) {
         stats = "(failed)";
     }
-    fprintf(stdout, "\n%s\n", stats.c_str());
+#ifdef STATISTIC_OPEN
+    double now = (Env::Default()->NowMicros() -bench_start_time) * 1e-6;
+    RECORD_INFO(7, "\n[time=%.2f]\n%s\n", now, stats.c_str());
 
-    // for (auto& b : versions_->current()->buckets_) {
-    //     std::string stats;
-    //     fprintf(stdout, "==== Bucket %s ====", b->largest.c_str());
-    //     if (!b->db->GetProperty("leveldb.stats", &stats)) {
-    //         stats = "(failed)";
-    //     }
-    //     fprintf(stdout, "\n%s\n", stats.c_str());
-    // }
+    RECORD_INFO(8, "\n[time=%.2f]\n", now);
+    for (auto& b : versions_->current()->buckets_) {
+        std::string stats;
+        RECORD_INFO(8, "==== Bucket %s ====", b->largest.c_str());
+        if (!b->db->GetProperty("leveldb.stats", &stats)) {
+            stats = "(failed)";
+        }
+        RECORD_INFO(8, "\n%s\n", stats.c_str());
+    }
+
+    // RECORD_INFO(9, "%.2f,%d,%d\n", now,
+    //             env_->GetThreadPoolQueueLen(Env::Priority::HIGH),
+    //             env_->GetThreadPoolQueueLen(Env::Priority::LOW));
+#else
+    fprintf(stdout, "\n%s\n", stats.c_str());
+    for (auto& b : versions_->current()->buckets_) {
+        std::string stats;
+        fprintf(stdout, "==== Bucket %s ====", b->largest.c_str());
+        if (!b->db->GetProperty("leveldb.stats", &stats)) {
+            stats = "(failed)";
+        }
+        fprintf(stdout, "\n%s\n", stats.c_str());
+    }
+#endif
 }
 
 // split bucket n to T new buckets

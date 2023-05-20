@@ -20,6 +20,7 @@
 #include "util/arena.h"
 #include "db/memtable.h"
 #include "util/hash_table.h"
+#include "util/perf_log.h"
 // #define LOGFILE
 namespace kv {
 class KV;

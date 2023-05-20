@@ -324,9 +324,7 @@ class Env {
   virtual void WaitForJoin() {}
 
   // Get thread pool queue length for specific thread pool.
-  virtual unsigned int GetThreadPoolQueueLen(Priority /*pri*/ = LOW) const {
-    return 0;
-  }
+  virtual unsigned int GetThreadPoolQueueLen(Priority /*pri*/ = LOW) const = 0;
 
   // The number of background worker threads of a specific thread pool
   // for this environment. 'LOW' is the default pool.

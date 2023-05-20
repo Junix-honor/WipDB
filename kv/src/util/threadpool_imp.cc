@@ -278,6 +278,11 @@ void ThreadPoolImpl::Impl::BGThread(size_t thread_id) {
       queue_.pop_front();
       queue_len_.store(static_cast<unsigned int>(queue_.size()),
                       std::memory_order_relaxed);
+#ifdef STATISTIC_OPEN
+      double now = (env_->NowMicros() - bench_start_time) * 1e-6;
+      RECORD_INFO(9, "%.2f,%d,%d\n", now, priority_,
+                  queue_len_.load(std::memory_order_relaxed));
+#endif
     }
     
     bool decrease_io_priority = (low_io_priority != low_io_priority_);
@@ -453,6 +458,11 @@ void ThreadPoolImpl::Impl::Submit(std::function<void()>&& schedule,
 
   queue_len_.store(static_cast<unsigned int>(queue_.size()),
     std::memory_order_relaxed);
+#ifdef STATISTIC_OPEN
+  double now = (env_->NowMicros() - bench_start_time) * 1e-6;
+  RECORD_INFO(9, "%.2f,%d,%d\n", now, priority_,
+              queue_len_.load(std::memory_order_relaxed));
+#endif
 
   if (!HasExcessiveThread()) {
     // Wake up at least one waiting thread.
@@ -486,6 +496,11 @@ int ThreadPoolImpl::Impl::UnSchedule(void* arg) {
     }
     queue_len_.store(static_cast<unsigned int>(queue_.size()),
       std::memory_order_relaxed);
+#ifdef STATISTIC_OPEN
+    double now = (env_->NowMicros() - bench_start_time) * 1e-6;
+    RECORD_INFO(9, "%.2f,%d,%d\n", now, priority_,
+                queue_len_.load(std::memory_order_relaxed));
+#endif
   }
 
 
@@ -520,6 +535,11 @@ int ThreadPoolImpl::Impl::UnSchedule(void* arg, int id) {
     }
     queue_len_.store(static_cast<unsigned int>(queue_.size()),
       std::memory_order_relaxed);
+#ifdef STATISTIC_OPEN
+    double now = (env_->NowMicros() - bench_start_time) * 1e-6;
+    RECORD_INFO(9, "%.2f,%d,%d\n", now, priority_,
+                queue_len_.load(std::memory_order_relaxed));
+#endif
   }
 
 

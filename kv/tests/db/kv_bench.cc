@@ -30,6 +30,7 @@
 #include "util/perfsvg.h"
 #include "gflags/gflags.h"
 #include "util/debug.h"
+#include "util/perf_log.h"
 
 
 using GFLAGS_NAMESPACE::ParseCommandLineFlags;
@@ -1601,7 +1602,19 @@ class Benchmark {
     WriteBatch batch;
     Status s;
     Duration duration(test_duration, num_);
-
+#ifdef STATISTIC_OPEN
+    int64_t t_last_num = 0;
+    int64_t t_last_bytes = 0;
+    double t_start_time = bench_start_time;
+    double t_last_time = t_start_time;
+    double t_cur_time;
+    std::string file_name =
+        "exp_throughput_" + std::to_string(thread->stats.id_);
+    FILE* fp = fopen(file_name.c_str(), "w");
+    if (fp == nullptr) printf("log failed\n");
+    fprintf(fp, "now,bw,iops,size,average bw,average iops\n");
+    fclose(fp);
+#endif
     int64_t bytes = 0;
     uint64_t i = 0;
     uint64_t printBucketInterval = 1000000000;
@@ -1628,6 +1641,33 @@ class Benchmark {
         exit(1);
       }
       i+=entries_per_batch_;
+      // iops bw 统计
+#ifdef STATISTIC_OPEN
+      t_cur_time = Env::Default()->NowMicros();
+      // Env::Default()->GetCurrentTime(&t_unix_time);
+      if (t_cur_time - t_last_time > 0.1 * 1e6) {
+        double use_time = (t_cur_time - t_last_time) * 1e-6;
+        int64_t ebytes = bytes - t_last_bytes;
+        double now = (t_cur_time - t_start_time) * 1e-6;
+        int64_t written_num = i - t_last_num;
+
+        fp = fopen(file_name.c_str(), "a");
+        if (fp == nullptr) printf("log failed\n");
+        fprintf(fp, "%.2f,%.2f,%.1f,%.1f,%.2f,%.1f \n", now,
+                (1.0 * ebytes / 1048576.0) / use_time,
+                1.0 * written_num / use_time, 1.0 * bytes / 1048576.0,
+                (1.0 * bytes / 1048576.0) / now, 1.0 * i / now);
+        fclose(fp);
+
+        t_last_time = t_cur_time;
+        t_last_bytes = bytes;
+        t_last_num = i;
+
+        if (thread->stats.id_ == 0) {
+          db_->PrintStats("kv.stats");
+        }
+      }
+#endif
     }
     thread->stats.AddBytes(bytes);
   }
@@ -2026,6 +2066,11 @@ int main(int argc, char** argv) {
   #ifndef __APPLE__
   kv::debug_perf_ppid();
   #endif
+#ifdef STATISTIC_OPEN
+  init_log_file();
+  bench_start_time = FLAGS_env->NowMicros();
+  RECORD_INFO(1, "%" PRId64, bench_start_time);
+#endif
   FLAGS_write_buffer_size = kv::Options().write_buffer_size;
   FLAGS_max_file_size = kv::Options().max_file_size;
   FLAGS_block_size = kv::Options().block_size;

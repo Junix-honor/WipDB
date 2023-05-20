@@ -480,6 +480,9 @@ Status DBImpl::WriteLevel0TableKV(MemTable* mem, VersionEdit* edit,
 void DBImpl::CompactMemTableKV() {
   mutex_.AssertHeld();
   assert(imm_ != nullptr);
+#ifdef STATISTIC_OPEN
+  double start = (env_->NowMicros() - bench_start_time) * 1e-6;
+#endif
 
   // Save the contents of the memtable as a new Table
   VersionEdit edit;
@@ -512,6 +515,10 @@ void DBImpl::CompactMemTableKV() {
   } else {
     RecordBackgroundError(s);
   }
+#ifdef STATISTIC_OPEN
+  double end = (env_->NowMicros() - bench_start_time) * 1e-6;
+  RECORD_INFO(5, "%s,%.2f,%.2f\n", dbname_.c_str(), start, end);
+#endif
 }
 
 void DBImpl::CompactRange(const Slice* begin, const Slice* end) {
@@ -770,6 +777,9 @@ void DBImpl::BackgroundCompaction(int level) {
   mutex_.AssertHeld();
 
   uint64_t start = env_->NowMicros();
+#ifdef STATISTIC_OPEN
+  double test_start = (env_->NowMicros() - bench_start_time) * 1e-6;
+#endif
 
   Compaction* c;
 
@@ -806,7 +816,10 @@ void DBImpl::BackgroundCompaction(int level) {
       (unsigned long long)env_->NowMicros() - start, 
       dbname_.c_str(),
       versions_->current()->DebugString().c_str());
-  
+#ifdef STATISTIC_OPEN
+  double test_end = (env_->NowMicros() - bench_start_time) * 1e-6;
+  RECORD_INFO(4, "%s,%.2f,%.2f,%d\n", dbname_.c_str(), test_start, test_end,level);
+#endif
 }
 
 void DBImpl::BGWorkCompactionManual(void* db) {
@@ -884,6 +897,9 @@ void DBImpl::BackgroundSplit() {
     return;
   }
 
+#ifdef STATISTIC_OPEN
+  double test_start = (env_->NowMicros() - bench_start_time) * 1e-6;
+#endif
   Compaction* c = nullptr;
   VersionSet::LevelSummaryStorage tmp;
   Log(options_.info_log, "Split pick all tables. %s %s", versions_->LevelSummary(&tmp), dbname_.c_str());
@@ -926,6 +942,10 @@ void DBImpl::BackgroundSplit() {
       bucket_->bottom_tables[i].median.DebugString().c_str(),
       bucket_->bottom_tables[i].largest.DebugString().c_str());
   }
+#ifdef STATISTIC_OPEN
+  double test_end = (env_->NowMicros() - bench_start_time) * 1e-6;
+  RECORD_INFO(6, "%s,%.2f,%.2f\n", dbname_.c_str(), test_start, test_end);
+#endif
 }
 
 
@@ -1713,8 +1733,23 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* my_batch, uint64_t
   MutexLock l(&mutex_);
 
   // check the split status, if split is scheduled, the return 
-  if (background_split_scheduled_) {
-    return Status::Splitting();
+  // if (background_split_scheduled_) {
+  //   return Status::Splitting();
+  // }
+  while (background_split_scheduled_) {
+#ifdef STATISTIC_OPEN
+    double test_start = (env_->NowMicros() - bench_start_time) * 1e-6;
+#endif
+    env_->FlushWaitAdd();
+    background_work_finished_signal_.Wait();
+    env_->FlushWaitDec();
+    Log(options_.info_log, "split stall\n");
+#ifdef STATISTIC_OPEN
+    double test_end = (env_->NowMicros() - bench_start_time) * 1e-6;
+    RECORD_INFO(3, "%s,stop,split,%.2f,%.2f\n", dbname_.c_str(), test_start,
+                test_end);
+#endif
+    if (!background_split_scheduled_) break;
   }
 
   writers_.push_back(&w);
@@ -1868,14 +1903,20 @@ Status DBImpl::MakeRoomForWriteKV(bool force) {
             Log(options_.info_log, "=== Priority Flush compaction. High Queue: %d", env_->GetThreadPoolQueueLen(Env::Priority::HIGH));
           }
         }
+#ifdef STATISTIC_OPEN
+        double test_start = (env_->NowMicros() - bench_start_time) * 1e-6;
+#endif
         env_->FlushWaitAdd();
         background_work_finished_signal_.Wait(); // wait background thread to flush，and notify
         env_->FlushWaitDec();
+#ifdef STATISTIC_OPEN
+        double test_end = (env_->NowMicros() - bench_start_time) * 1e-6;
+        RECORD_INFO(3, "%s,stop,MMO,%.2f,%.2f\n", dbname_.c_str(), test_start, test_end);
+#endif
         Log(options_.info_log, "Imm Table full; waiting released(%llu us). ... %s\n", (unsigned long long) env_->NowMicros() - start, versions_->LevelSummary(&tmp));
         has_flush_wait_ = false;
       }
-    } 
-    else if (versions_->NumLevelFiles(0) >= 16) { 
+    } else if (versions_->NumLevelFiles(0) >= 16) {
       // There are too many level-0 files.
       VersionSet::LevelSummaryStorage tmp;
       Log(options_.info_log, "Too many L0 files; waiting start... High queue: %d, Low queue: %d. %s\n", env_->GetThreadPoolQueueLen(Env::Priority::HIGH), env_->GetThreadPoolQueueLen(Env::Priority::LOW), versions_->LevelSummary(&tmp)) ;
@@ -1897,13 +1938,19 @@ Status DBImpl::MakeRoomForWriteKV(bool force) {
           Log(options_.info_log, "=== Priority Level-0 compaction. Too many files. HIGH Queue after: %d ", env_->GetThreadPoolQueueLen(Env::Priority::HIGH));
         }
       }
+#ifdef STATISTIC_OPEN
+      double test_start = (env_->NowMicros() - bench_start_time) * 1e-6;
+#endif
       env_->FlushWaitAdd();
       background_work_finished_signal_.Wait();
       env_->FlushWaitDec();
       Log(options_.info_log, "Too many L0 files; waiting finish: %llu ... High queue: %d, Low queue: %d. %s\n", (unsigned long long) env_->NowMicros() - start,  env_->GetThreadPoolQueueLen(Env::Priority::HIGH), env_->GetThreadPoolQueueLen(Env::Priority::LOW), versions_->LevelSummary(&tmp)) ;
+#ifdef STATISTIC_OPEN
+      double test_end = (env_->NowMicros() - bench_start_time) * 1e-6;
+      RECORD_INFO(3, "%s,stop,L0O,%.2f,%.2f\n", dbname_.c_str(), test_start, test_end);
+#endif
       has_too_many_level0_files_ = false;
-    }  
-    else {
+    } else {
       imm_ = mem_;
       if (force) {
         Log(options_.info_log, "Force make room. mem to imm. mem used space %llu", (unsigned long long)mem_->ActualMemoryUsage());
@@ -1951,9 +1998,9 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
              "--------------------------------------------------\n"
              );
     value->append(buf);
-    for (int level = 0; level < config::kNumLevels; level++) {
+    for (int level = 0; level <= config::kSplitLevel; level++) {
       int files = versions_->NumLevelFiles(level);
-      if (stats_[level].micros > 0 || files > 0) {
+      // if (stats_[level].micros > 0 || files > 0) {
         snprintf(
             buf, sizeof(buf),
             "%3d %8d %8.0f %9.2f %8.2f %9.2f\n",
@@ -1964,7 +2011,7 @@ bool DBImpl::GetProperty(const Slice& property, std::string* value) {
             stats_[level].bytes_read / 1048576.0,
             stats_[level].bytes_written / 1048576.0);
         value->append(buf);
-      }
+      // }
     }
     return true;
   } else if (in == "sstables") {

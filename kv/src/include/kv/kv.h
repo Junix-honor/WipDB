@@ -22,6 +22,7 @@
 #include "db/bucket.h"
 #include "util/hpblock.h"
 #include "db/versionkv.h"
+#include "util/perf_log.h"
 
 namespace kv {
 class KVInserter;

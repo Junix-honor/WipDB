@@ -41,7 +41,7 @@ tune2fs -O ^has_journal /dev/sdb
 # 设置 CPU 到性能模式
 # set CPU in performance mode
 cmd='-g performance'
-# cmd='-g conservative'
+# cmd='-g powersave'
 MAX_CPU=$((`nproc --all` - 1))
 for i in $(seq 0 $MAX_CPU); do
     echo "Changing CPU " $i " with parameter "$cmd;

@@ -65,6 +65,8 @@ set(UTIL_SRCS
     "trace.cc"
     "trace.h"
     "util.h"
+    "perf_log.h"
+    "perf_log.cc"
 )
 set_source_files_properties(
     crc32c.cc

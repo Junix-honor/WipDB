@@ -43,7 +43,8 @@ HugePageBlock::HugePageBlock(int size) {
     }
     initial_addr_ = (char*) mmap(ADDR, size_, PROTECTION, FLAGS, -1, 0);
     if (initial_addr_ == MAP_FAILED) {
-        fprintf(stderr, "mmap %d hugepage fail.\n", (int)size_);
+        fprintf(stderr, "mmap %d hugepage fail. %d-%s\n", (int)size_, errno,
+                strerror(errno));
         exit(1);
     }
 
